@@ -1,8 +1,8 @@
 <template>
   <div
-    class="sticky top-0 z-50 flex flex-col-reverse items-start justify-between gap-8 pt-4 pb-2 pr-6 font-bold lg:flex-row backdrop-blur-sm text-primary"
+    class="sticky top-0 z-50 flex flex-col-reverse items-center justify-between gap-8 pr-6 font-bold lg:flex-row backdrop-blur-sm text-primary"
   >
-    <div class="flex flex-col-reverse items-start gap-8 pr-6 lg:flex-row">
+    <div class="flex flex-col-reverse items-center w-full gap-8 pr-6 lg:flex-row lg:justify-between">
       <div class="flex flex-col gap-1 w-fit">
         <div class="text-2xl capitalize">{{ title }}</div>
 
@@ -33,8 +33,8 @@
 
       <div v-if="showAlert" class="flex flex-row items-center gap-2 max-w-[400px]">
         <span class="relative flex w-3 h-3">
-          <span class="absolute inline-flex w-full h-full rounded-full opacity-75 animate-ping bg-amber-400"></span>
-          <span class="relative inline-flex w-3 h-3 rounded-full bg-amber-500"></span>
+          <span class="absolute inline-flex w-full h-full rounded-full opacity-75 animate-ping bg-amber-400" />
+          <span class="relative inline-flex w-3 h-3 rounded-full bg-amber-500" />
         </span>
         <NMarquee class="border-b-2 text-amber-600 border-amber-400">
           <div class="flex flex-row gap-2 px-4">
@@ -45,26 +45,27 @@
           </div>
         </NMarquee>
         <span class="relative flex w-3 h-3">
-          <span class="absolute inline-flex w-full h-full rounded-full opacity-75 animate-ping bg-amber-400"></span>
-          <span class="relative inline-flex w-3 h-3 rounded-full bg-amber-500"></span>
+          <span class="absolute inline-flex w-full h-full rounded-full opacity-75 animate-ping bg-amber-400" />
+          <span class="relative inline-flex w-3 h-3 rounded-full bg-amber-500" />
         </span>
       </div>
-    </div>
-
-    <div class="flex flex-row items-center gap-2 bg-white border rounded-full shadow-lg shadow-sky-200">
-      <NInput
-        v-model:value="search.query"
-        placeholder="Cerca..."
-        class="rounded-full"
-        :bordered="false"
-        @keyup.enter="runGlobalSearch"
-      />
-      <div class="flex items-center justify-center p-1 rounded-full">
-        <n-button strong primary circle type="info" @click="runGlobalSearch">
-          <template #icon>
-            <Icon icon="solar:magnifer-bold-duotone" height="32" />
-          </template>
-        </n-button>
+      <div class="flex flex-row items-center gap-2">
+        <div class="flex flex-row items-center justify-end w-96">
+          <div class="-mr-8 transition-all duration-500" :class="showSearch ? 'w-full' : 'w-0'">
+            <NInput
+              v-model:value="search.query"
+              class="z-10 flex items-center w-full h-12 rounded-l-full"
+              placeholder="Cerca..."
+              @keyup.enter="runGlobalSearch"
+            />
+          </div>
+          <div
+            class="z-20 flex items-center justify-center my-2 transition-all duration-300 rounded-full h-14 w-14 hover:ring-4 hover:ring-sky-300 hover:scale-105 bg-secondary hover:cursor-pointer hover:rotate-180"
+            @click="showSearch = !showSearch"
+          >
+            <Icon icon="solar:magnifer-bold-duotone" class="text-2xl text-white" />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -94,6 +95,7 @@
   })
   const showAlert = ref(false)
   const latestAlert = ref()
+  const showSearch = ref(false)
 
   const getLatestAlert = async () => {
     const res = await getAlert()
@@ -132,6 +134,12 @@
   }
 
   onMounted(async () => {
-    setIntervalMethod(getLatestAlert, 30 * 60 * 1000) // 30 min
+    try {
+      setIntervalMethod(getLatestAlert, 30 * 60 * 1000) // 30 min
+    } catch (error) {
+      console.error(error)
+    } finally {
+      loading.value = false
+    }
   })
 </script>

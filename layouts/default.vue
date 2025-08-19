@@ -21,6 +21,7 @@
               </div>
               <NDivider />
               <div class="flex flex-col gap-1">
+                <!-- MENU -->
                 <div
                   v-for="menuItem in menu"
                   :key="menuItem.path"
@@ -130,6 +131,7 @@
         </div>
         <div class="w-full h-full px-2 pb-4 ml-10">
           <NuxtPage />
+          <NBackTop />
         </div>
       </div>
     </div>
@@ -137,8 +139,10 @@
 </template>
 
 <script setup>
+  // components
+
   import { menu, websiteIdentity } from '~/utils/staticData/menu.js'
-  import { NCollapse, NCollapseItem, NTooltip, NSpace, NDivider } from 'naive-ui'
+  import { NCollapse, NCollapseItem, NTooltip, NSpace, NDivider, NBackTop } from 'naive-ui'
   import { Icon } from '@iconify/vue'
   import { useHead } from '#imports'
   import { delay } from '~/utils/index.js'
@@ -146,6 +150,7 @@
   const router = useRouter()
   const route = useRoute()
 
+  const userLoggedIn = ref(false)
   const subMenusCollapsed = ref([])
   const collapsed = ref(false)
   const showLabels = ref(true)
