@@ -5,17 +5,26 @@
 
     <div class="flex flex-col-reverse gap-8 xl:flex-row">
       <div v-if="news.length === 0" class="w-full">
-        <NEmpty description="Nessun risultato trovato" class="p-4 bg-white border w-fit h-fit rounded-xl" />
+        <NEmpty
+          description="Nessun risultato trovato"
+          class="p-4 bg-white border w-fit h-fit rounded-xl"
+        />
       </div>
       <div v-else class="flex flex-col w-full gap-4 xl:w-2/3">
         <div class="flex flex-col gap-6">
-          <NewsCard v-for="post in news" :key="post.slug" :post="post" :vertical="false" />
+          <NewsCard
+            v-for="post in news"
+            :key="post.slug"
+            :post="post"
+            :vertical="false"
+          />
         </div>
-        <NPagination
-          v-model:page="pagination.page"
-          :page-count="pagination.totalPages"
-          size="large"
-          @update:page="updatePage"
+        <PaginationComponent
+          :total="total"
+          :per-page="perPage"
+          :current-page="currentPage"
+          :per-page-options="[3, 6, 12, 24]"
+          @page-change="handlePageChange"
         />
       </div>
       <div
@@ -26,7 +35,7 @@
           placeholder="Cerca..."
           type="text"
           clearable
-          @keypress.enter="runSearch"
+          @keypress.enter="getNews(true)"
         />
         <n-date-picker
           v-model:value="filters.range"
@@ -36,8 +45,15 @@
           end-placeholder="A"
           clearable
         />
-        <n-select v-model:value="filters.tags" :options="optionsTags" placeholder="Tag" filterable multiple clearable />
-        <n-button strong secondary type="error" @click="runSearch">
+        <n-select
+          v-model:value="filters.tags"
+          :options="optionsTags"
+          placeholder="Tag"
+          filterable
+          multiple
+          clearable
+        />
+        <n-button strong secondary type="error" @click="getNews(true)">
           Cerca
           <template #icon>
             <n-icon>
@@ -51,87 +67,99 @@
 </template>
 
 <script setup>
-  import { getPosts } from '~/api/posts'
-  import { NPagination } from 'naive-ui'
-  import { Icon } from '@iconify/vue'
+  import { getPosts } from "~/api/posts";
+  import { Icon } from "@iconify/vue";
+  import { goToTop } from "#imports";
 
-  import LoaderComponent from '~/components/common/LoaderComponent.vue'
-  import HeaderComponent from '~/components/common/HeaderComponent.vue'
-  import NewsCard from '~/components/common/NewsCard.vue'
+  import LoaderComponent from "~/components/common/LoaderComponent.vue";
+  import HeaderComponent from "~/components/common/HeaderComponent.vue";
+  import PaginationComponent from "~/components/common/PaginationComponent.vue";
+  import NewsCard from "~/components/common/NewsCard.vue";
 
   // store
-  import { useCategoriesStore } from '~/stores/categories'
-  import { useTagsStore } from '~/stores/tags'
-  const categoriesStore = useCategoriesStore()
-  const tagsStore = useTagsStore()
-  const categories = ref([])
-  const tags = ref([])
+  import { useTagsStore } from "~/stores/tags";
+  const tagsStore = useTagsStore();
+  const tags = ref([]);
+
+  const breadcrumb = ref([
+    {
+      title: "Home",
+      slug: "/",
+    },
+    {
+      title: "News",
+      slug: "/news",
+    },
+  ]);
+
+  const currentPage = ref(1);
+  const total = ref(0);
+  const perPage = ref(6);
+
+  const pagination = ref({
+    page: currentPage.value,
+    itemCount: total.value,
+    perPage: perPage.value,
+    "show-size-picker": true,
+  });
 
   const filters = ref({
     search: null,
     tags: [],
     range: null,
-  })
-  const optionsTags = computed(() => tags.value.map((tag) => ({ label: tag?.name, value: tag?.id })))
-  const loading = ref(false)
-  const news = ref([])
-  const breadcrumb = ref([
-    {
-      title: 'Home',
-      slug: '/',
-    },
-    {
-      title: 'News',
-      slug: '/news',
-    },
-  ])
+  });
+  const optionsTags = computed(() =>
+    tags.value.map((tag) => ({ label: tag?.name, value: tag?.documentId }))
+  );
+  const loading = ref(false);
+  const news = ref([]);
 
-  const pagination = ref({
-    page: 1,
-  })
-
-  const updatePage = async (page) => {
+  const getNews = async (search = false) => {
     try {
-      loading.value = true
-      const filtersToRun = { categories: ['news'], limit: 4, page: page, ...filters.value }
-      if (filtersToRun.tags.length === 0) delete filtersToRun.tags
-      if (!filtersToRun.range) delete filtersToRun.range
+      loading.value = true;
+      if (search) {
+        currentPage.value = 1;
+      }
 
-      categories.value = await categoriesStore.getCategories()
-      tags.value = await tagsStore.getTags()
+      const filtersToRun = ref({ categories: ["news"] });
 
-      const res = await getPosts(filtersToRun, categories.value, tags.value)
-      news.value = res.posts
-      pagination.value = res.pagination
+      if (filters.value.search) {
+        filtersToRun.value.query = filters.value.search;
+      }
+      if (filters.value.range) {
+        filtersToRun.value.startDate = new Date(filters.value.range[0])
+          .toISOString()
+          .split("T")[0];
+        filtersToRun.value.endDate = new Date(filters.value.range[1])
+          .toISOString()
+          .split("T")[0];
+      }
+      if (filters.value.tags.length > 0) {
+        filtersToRun.value.tags = filters.value.tags;
+      }
+
+      pagination.value = `pagination[page]=${currentPage.value}&pagination[pageSize]=${perPage.value}`;
+      const res = await getPosts(filtersToRun.value, pagination.value);
+      news.value = res.data;
+      total.value = res.meta.pagination.total;
+      pagination.value = { ...res.meta.pagination };
+
+      goToTop();
     } catch (err) {
-      console.error(err)
+      console.error(err);
     } finally {
-      loading.value = false
+      loading.value = false;
     }
-  }
+  };
 
-  const runSearch = async () => {
-    try {
-      loading.value = true
-      const filtersToRun = { categories: ['news'], limit: 4, page: 1, ...filters.value }
-      if (filtersToRun.tags.length === 0) delete filtersToRun.tags
-      if (!filtersToRun.range) delete filtersToRun.range
-
-      categories.value = await categoriesStore.getCategories()
-      tags.value = await tagsStore.getTags()
-
-      const res = await getPosts(filtersToRun, categories.value, tags.value)
-      news.value = res.posts
-      pagination.value = res.pagination
-    } catch (err) {
-      console.error(err)
-    } finally {
-      loading.value = false
-    }
-  }
-
+  const handlePageChange = async (page, itemsPerPage) => {
+    currentPage.value = page;
+    perPage.value = itemsPerPage;
+    news.value = [];
+    await getNews();
+  };
   onMounted(async () => {
-    await updatePage(1)
-    // tags.value = tagsStore.getTags
-  })
+    await getNews();
+    tags.value = await tagsStore.getTags();
+  });
 </script>

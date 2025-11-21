@@ -1,48 +1,54 @@
 import { WORDPRESS_BASE_URL } from "../utils/staticData/constants";
+import { getData } from "#imports";
 
-export const getPosts = async (queryObj, categories, tags) => {
+export const getPosts = async (queryObj, pagination) => {
   try {
-    const config = useRuntimeConfig();
-    const token = config.public.strapi.token;
-    
     const query = {
       populate: ["*"],
-      sort: ["publishedAt:desc"],
+      sort: ["createdAt:desc"],
     };
 
-    if(queryObj?.categories){
+    if(queryObj?.perPage) query["pagination[limit]"] = queryObj?.perPage
+    if(queryObj?.page) query["pagination[page]"] = queryObj?.page
+    if(queryObj?.limit) query["pagination[limit]"] = queryObj?.limit
+
+    if (queryObj?.categories) {
       query["filters[category][slug][$eq]"] = queryObj?.categories[0];
     }
 
-    if(queryObj?.limit){
-      query["pagination[limit]"] = queryObj?.limit;
-    }
-
-    if(queryObj?.excerpt){
+    if (queryObj?.excerpt) {
       query["excerptLength"] = queryObj?.excerpt;
     }
 
-    const resStrapi = await $fetch(`${config.public.strapi.url}/api/articles`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      query,
-    });
+    if (queryObj?.query) {
+      query["filters[title][$containsi]"] = queryObj?.query;
+      query["filters[content][$containsi]"] = queryObj?.query;
+    }
+
+    // Start date
+    if (queryObj?.startDate) {
+      query["filters[$and][0][start][$gte]"] = queryObj?.startDate;
+    }
+    if (queryObj?.endDate) {
+      query["filters[$and][1][start][$lte]"] = queryObj?.endDate;
+    }
+
+    // Tags
+    if (queryObj?.tags && queryObj?.tags.length > 0) {
+      queryObj?.tags.forEach((tag, index) => {
+        query[`filters[$or][${index}][tags][documentId][$eq]`] = tag;
+      });
+    }
+
+    const resStrapi = await getData(`articles?${pagination||''}`, query);
 
     resStrapi.data.forEach((post) => {
       post.createdAt = new Date(post.createdAt).toLocaleDateString("it-IT");
-      if(post.start) new Date(post.start).toLocaleDateString("it-IT");
-      if(post.end) new Date(post.end).toLocaleDateString("it-IT");
-    })
-    
-    return {
-      posts: resStrapi.data,
-      pagination: {
-        total: resStrapi.meta.pagination.total,
-        limit: resStrapi.meta.pagination.limit,
-        start: resStrapi.meta.pagination.start,
-      },
-    };
+      if (post.start) new Date(post.start).toLocaleDateString("it-IT");
+      if (post.end) new Date(post.end).toLocaleDateString("it-IT");
+    });
+
+    return resStrapi;
   } catch (err) {
     console.error(err);
   }
@@ -131,15 +137,18 @@ export const getPostById = async (id, categories = [], tags = []) => {
     const config = useRuntimeConfig();
     const token = config.public.strapi.token;
 
-    const resStrapi = await $fetch(`${config.public.strapi.url}/api/articles/${id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      params: {
-        populate: ["*"],
-      },
-    });
-    return resStrapi.data
+    const resStrapi = await $fetch(
+      `${config.public.strapi.url}/api/articles/${id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        params: {
+          populate: ["*"],
+        },
+      }
+    );
+    return resStrapi.data;
   } catch (err) {
     console.error(err);
   }
