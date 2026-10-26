@@ -164,9 +164,35 @@
                 </div>
               </div>
             </div>
+            <div class="flex flex-col gap-2 mt-4">
+              <div
+                v-if="authStore.isAuthenticated"
+                class="flex flex-row items-center justify-center gap-2 mb-2 text-base font-semibold text-white"
+              >
+                <Icon icon="solar:user-circle-bold" height="28" />
+                <div>{{ authStore.user?.displayName }}</div>
+              </div>
+            </div>
             <Button
               color="white"
-              icon="solar:accessibility-linear"
+              :icon="
+                authStore.isAuthenticated ? 'solar:logout-bold' : (
+                  'solar:login-bold'
+                )
+              "
+              :title="authStore.isAuthenticated ? 'Logout' : 'Login'"
+              :show-labels="showLabels"
+              show-tooltip
+              class="mb-2"
+              @click="
+                authStore.isAuthenticated ?
+                  authStore.logout()
+                : (showLoginModal = true)
+              "
+            />
+            <Button
+              color="white"
+              icon="solar:accessibility-line-duotone"
               title="Accessibilità"
               :show-labels="showLabels"
               show-tooltip
@@ -285,6 +311,57 @@
         </template>
       </NCard>
     </NModal>
+    <NModal v-model:show="showLoginModal">
+      <NCard
+        style="width: 600px"
+        title="Login"
+        :bordered="true"
+        size="huge"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="flex flex-col gap-2">
+          <div
+            class="flex flex-col justify-between w-full gap-1 mb-4 text-lg text-black"
+          >
+            <div class="w-fit">Nome utente</div>
+            <n-input
+              v-model:value="loginForm.username"
+              placeholder="Nome utente"
+              type="text"
+              clearable
+              @keypress.enter="login"
+            />
+          </div>
+          <div
+            class="flex flex-col justify-between w-full gap-1 text-lg text-black"
+          >
+            <div class="w-fit">Password</div>
+            <n-input
+              v-model:value="loginForm.password"
+              placeholder="Password"
+              type="password"
+              clearable
+              @keypress.enter="login"
+            />
+          </div>
+          <div v-if="authStore.error" class="text-red-500">
+            {{ authStore.error }}
+          </div>
+        </div>
+        <template #footer>
+          <div class="flex flex-row justify-end gap-2">
+            <Button
+              title="Login"
+              color="primary"
+              class="text-white bg-primary hover:bg-opacity-80"
+              @clicked="login"
+            />
+            <Button title="Chiudi" color="darkGray" @clicked="closeModal" />
+          </div>
+        </template>
+      </NCard>
+    </NModal>
   </div>
   <!-- </NSpace> -->
 </template>
@@ -297,7 +374,6 @@
     NCollapse,
     NCollapseItem,
     NTooltip,
-    NSpace,
     NDivider,
     NBackTop,
     NButton,
@@ -306,10 +382,12 @@
   import { useAccessibilityStore } from "@/stores/accessibilityStore";
   import { useHead } from "#imports";
   import { delay } from "~/utils/index.js";
+  import { useAuthStore } from "~/stores/auth";
   import Button from "~/components/common/Button.vue";
 
   const router = useRouter();
   const route = useRoute();
+  const authStore = useAuthStore();
 
   // A11y
   const accessibilityStore = useAccessibilityStore();
@@ -319,6 +397,12 @@
   const highContrast = ref(isHighContrast.value);
 
   const showA11yModal = ref(false);
+  const showLoginModal = ref(false);
+
+  const loginForm = ref({
+    username: "",
+    password: "",
+  });
 
   const subMenusCollapsed = ref([]);
   const collapsed = ref(false);
@@ -332,7 +416,7 @@
       .at(-1)
       .split("-")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ")
+      .join(" "),
   );
 
   watch(
@@ -344,21 +428,21 @@
       if (menuItem?.submenu) {
         subMenusCollapsed.value.push(menuItem.title);
       }
-    }
+    },
   );
 
   watch(
     () => largeFont.value,
     () => {
       accessibilityStore.toggleFontSize();
-    }
+    },
   );
 
   watch(
     () => highContrast.value,
     () => {
       accessibilityStore.toggleContrast();
-    }
+    },
   );
 
   const toggleLargeFont = () => {
@@ -372,6 +456,21 @@
     title: pageTitle,
   });
 
+  const closeModal = () => {
+    loginForm.value.username = "";
+    loginForm.value.password = "";
+    showLoginModal.value = false;
+  };
+
+  const login = async () => {
+    try {
+      await authStore.login(loginForm.value.username, loginForm.value.password);
+      if (authStore.isAuthenticated) closeModal();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const collapseSidebar = async () => {
     collapsed.value = !collapsed.value;
     if (!collapsed.value) {
@@ -383,7 +482,7 @@
   const expandMenu = (title) => {
     if (subMenusCollapsed.value.includes(title)) {
       subMenusCollapsed.value = subMenusCollapsed.value.filter(
-        (item) => item !== title
+        (item) => item !== title,
       );
     } else {
       subMenusCollapsed.value.push(title);
